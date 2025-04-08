@@ -11,11 +11,13 @@ class SessionModel extends ChangeNotifier {
   int _focusedBlockIndex = 0;
   bool _showCommandSuggestions = false;
   String _currentCommand = '';
+  double _commandEditorPositionY = 0;
 
   List<Block> get blocks => _blocks;
   int get focusedBlockIndex => _focusedBlockIndex;
   bool get showCommandSuggestions => _showCommandSuggestions;
   String get currentCommand => _currentCommand;
+  double get commandEditorPositionY => _commandEditorPositionY;
 
   int get totalDurationMinutes {
     int total = 0;
@@ -25,6 +27,18 @@ class SessionModel extends ChangeNotifier {
       }
     }
     return total;
+  }
+
+  void setCommandEditorPosition(double positionY) {
+    _commandEditorPositionY = positionY;
+    notifyListeners();
+  }
+
+  void addEmptyBlock() {
+    final newBlock = TextBlock(text: '');
+    _blocks.add(newBlock);
+    _focusedBlockIndex = _blocks.length - 1;
+    notifyListeners();
   }
 
   void addBlock(Block block) {
@@ -87,10 +101,15 @@ class SessionModel extends ChangeNotifier {
 
   void convertCommandToBlock() {
     if (_currentCommand.isNotEmpty) {
+      print("Parsing command: $_currentCommand");
       final block = CommandParser.parseCommand(_currentCommand);
+      print("Created block type: ${block.runtimeType}");
+
       if (_focusedBlockIndex >= 0 && _focusedBlockIndex < _blocks.length) {
+        print("Updating block at index: $_focusedBlockIndex");
         _blocks[_focusedBlockIndex] = block;
       } else {
+        print("Adding new block, focused index: $_focusedBlockIndex");
         _blocks.add(block);
         _focusedBlockIndex = _blocks.length - 1;
       }

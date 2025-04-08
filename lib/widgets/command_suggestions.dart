@@ -4,10 +4,12 @@ import '../models/session_model.dart';
 
 class CommandSuggestions extends StatelessWidget {
   final String currentCommand;
+  final Function(String)? onSuggestionSelected;
 
   const CommandSuggestions({
     Key? key,
     required this.currentCommand,
+    this.onSuggestionSelected,
   }) : super(key: key);
 
   @override
@@ -60,7 +62,11 @@ class CommandSuggestions extends StatelessWidget {
                 }
               }
 
-              sessionModel.setCurrentCommand(newCommand);
+              if (onSuggestionSelected != null) {
+                onSuggestionSelected!(suggestion.command);
+              } else {
+                sessionModel.setCurrentCommand(newCommand);
+              }
             },
           );
         },

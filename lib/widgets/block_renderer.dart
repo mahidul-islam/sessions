@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/block.dart';
 import '../models/circuit_block.dart';
@@ -11,12 +12,12 @@ import 'block_types/interval_block_renderer.dart';
 import 'block_types/text_block_renderer.dart';
 import 'block_types/workout_block_renderer.dart';
 
-class BlockRenderer extends StatelessWidget {
+class BlockRenderer extends StatefulWidget {
   final Block block;
   final int index;
   final bool isFocused;
 
-  BlockRenderer({
+  const BlockRenderer({
     Key? key,
     required this.block,
     required this.index,
@@ -24,45 +25,171 @@ class BlockRenderer extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<BlockRenderer> createState() => _BlockRendererState();
+}
+
+class _BlockRendererState extends State<BlockRenderer> {
+  late TextEditingController _commandController;
+  late FocusNode _textFieldFocusNode;
+  late FocusNode _keyboardListenerFocusNode; // Add a second focus node
+
+  bool _isEditingCommand = false;
+  final GlobalKey _blockKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _commandController = TextEditingController();
+    _textFieldFocusNode = FocusNode();
+    _keyboardListenerFocusNode = FocusNode(); // Initialize the new focus node
+  }
+
+  @override
+  void dispose() {
+    _commandController.dispose();
+    _textFieldFocusNode.dispose();
+    _keyboardListenerFocusNode.dispose(); // Dispose the new focus node
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final sessionModel = Provider.of<SessionModel>(context);
 
+    // If this is a newly created block, start in edit mode
+    if (widget.isFocused &&
+        widget.block is TextBlock &&
+        (widget.block as TextBlock).text.isEmpty &&
+        !_isEditingCommand) {
+      // Use a post-frame callback to start editing
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _startCommandEditing();
+        }
+      });
+    }
+
     return Container(
+      key: _blockKey,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        border: isFocused
-            ? Border.all(
-                color: Theme.of(context).colorScheme.primary,
-                width: 2,
-              )
+        border: widget.isFocused
+            ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
             : null,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Focus(
-        onFocusChange: (hasFocus) {
-          if (hasFocus) {
-            sessionModel.setFocusedBlockIndex(index);
-          }
-        },
-        child: GestureDetector(
-          onTap: () => sessionModel.setFocusedBlockIndex(index),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDragHandle(context),
-              Expanded(
-                child: _buildBlockContent(context),
-              ),
-            ],
+      child: _isEditingCommand
+          ? _buildCommandEditor(context, sessionModel)
+          : _buildBlockView(context, sessionModel),
+    );
+  }
+
+  Widget _buildBlockView(BuildContext context, SessionModel sessionModel) {
+    return GestureDetector(
+      onTap: () => sessionModel.setFocusedBlockIndex(widget.index),
+      onDoubleTap: _startCommandEditing,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDragHandle(context, sessionModel),
+          Expanded(
+            child: _buildBlockContent(context),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _startCommandEditing() {
+    final sessionModel = Provider.of<SessionModel>(context, listen: false);
+    _commandController.text = widget.block.toCommandString();
+    sessionModel.setCurrentCommand(_commandController.text);
+
+    setState(() {
+      _isEditingCommand = true;
+    });
+
+    // Request focus after render
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _textFieldFocusNode.requestFocus(); // Use the text field focus node
+    });
+
+    // Notify model of command position for suggestions
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_blockKey.currentContext != null) {
+        final RenderBox box =
+            _blockKey.currentContext!.findRenderObject() as RenderBox;
+        final position = box.localToGlobal(Offset.zero);
+        sessionModel.setCommandEditorPosition(position.dy + box.size.height);
+      }
+    });
+  }
+
+  Widget _buildCommandEditor(BuildContext context, SessionModel sessionModel) {
+    return RawKeyboardListener(
+      focusNode:
+          _keyboardListenerFocusNode, // Use the keyboard listener focus node
+
+      onKey: (event) {
+        if (event is RawKeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.escape) {
+            _cancelEditing();
+          } else if (event.logicalKey == LogicalKeyboardKey.backspace &&
+              _commandController.text.isEmpty) {
+            _cancelEditing();
+          }
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: TextField(
+          controller: _commandController,
+          focusNode: _textFieldFocusNode, // Use the text field focus node
+
+          decoration: InputDecoration(
+            hintText: 'Type / for commands or enter text',
+            border: InputBorder.none,
+            prefixIcon: _commandController.text.startsWith('/')
+                ? const Icon(Icons.code)
+                : const Icon(Icons.text_fields),
+          ),
+          onChanged: (value) {
+            sessionModel.setCurrentCommand(value);
+          },
+          onSubmitted: (value) {
+            if (value.isEmpty) {
+              _cancelEditing();
+              return;
+            }
+
+            if (value.startsWith('/')) {
+              sessionModel.convertCommandToBlock();
+            } else {
+              // Create text block
+              final textBlock = TextBlock(text: value);
+              sessionModel.updateBlockAt(widget.index, textBlock);
+            }
+
+            setState(() {
+              _isEditingCommand = false;
+            });
+            sessionModel.setCurrentCommand('');
+          },
         ),
       ),
     );
   }
 
-  Widget _buildDragHandle(BuildContext context) {
+  void _cancelEditing() {
     final sessionModel = Provider.of<SessionModel>(context, listen: false);
+    setState(() {
+      _isEditingCommand = false;
+    });
+    sessionModel.setCurrentCommand('');
+  }
 
+  Widget _buildDragHandle(BuildContext context, SessionModel sessionModel) {
     return GestureDetector(
       onTap: _showBlockMenu,
       child: Padding(
@@ -70,74 +197,41 @@ class BlockRenderer extends StatelessWidget {
         child: Icon(
           Icons.drag_indicator,
           size: 20,
-          color:
-              isFocused ? Theme.of(context).colorScheme.primary : Colors.grey,
+          color: widget.isFocused
+              ? Theme.of(context).colorScheme.primary
+              : Colors.grey,
         ),
       ),
     );
   }
 
   Widget _buildBlockContent(BuildContext context) {
-    if (block is TextBlock) {
-      return TextBlockRenderer(block: block as TextBlock);
-    } else if (block is IntervalBlock) {
-      return IntervalBlockRenderer(block: block as IntervalBlock);
-    } else if (block is CircuitBlock) {
-      return CircuitBlockRenderer(block: block as CircuitBlock);
-    } else if (block is WorkoutBlock) {
-      return WorkoutBlockRenderer(block: block as WorkoutBlock);
+    if (widget.block is TextBlock) {
+      return TextBlockRenderer(block: widget.block as TextBlock);
+    } else if (widget.block is IntervalBlock) {
+      return IntervalBlockRenderer(block: widget.block as IntervalBlock);
+    } else if (widget.block is CircuitBlock) {
+      return CircuitBlockRenderer(block: widget.block as CircuitBlock);
+    } else if (widget.block is WorkoutBlock) {
+      return WorkoutBlockRenderer(block: widget.block as WorkoutBlock);
     }
 
     // Fallback
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Text('Unknown block type: ${block.runtimeType}'),
+      child: Text('Unknown block type: ${widget.block.runtimeType}'),
     );
   }
 
   void _showBlockMenu() {
-    final context = _dragHandleKey.currentContext;
-    if (context == null) return;
-
-    final RenderBox button = context.findRenderObject() as RenderBox;
-    final RenderBox overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(Offset.zero, ancestor: overlay),
-        button.localToGlobal(button.size.bottomRight(Offset.zero),
-            ancestor: overlay),
-      ),
-      Offset.zero & overlay.size,
-    );
-
     final sessionModel = Provider.of<SessionModel>(context, listen: false);
 
     showMenu(
       context: context,
-      position: position,
+      position: RelativeRect.fill,
       items: [
         PopupMenuItem(
-          child: const Row(
-            children: [
-              Icon(Icons.delete_outline, size: 20),
-              SizedBox(width: 8),
-              Text('Delete'),
-            ],
-          ),
-          onTap: () => sessionModel.removeBlockAt(index),
-        ),
-        PopupMenuItem(
-          child: const Row(
-            children: [
-              Icon(Icons.content_copy, size: 20),
-              SizedBox(width: 8),
-              Text('Duplicate'),
-            ],
-          ),
-          onTap: () => sessionModel.duplicateBlockAt(index),
-        ),
-        PopupMenuItem(
+          onTap: _startCommandEditing,
           child: const Row(
             children: [
               Icon(Icons.edit, size: 20),
@@ -145,11 +239,28 @@ class BlockRenderer extends StatelessWidget {
               Text('Edit as command'),
             ],
           ),
-          onTap: () => sessionModel.convertBlockToCommand(index),
+        ),
+        PopupMenuItem(
+          onTap: () => sessionModel.removeBlockAt(widget.index),
+          child: const Row(
+            children: [
+              Icon(Icons.delete_outline, size: 20),
+              SizedBox(width: 8),
+              Text('Delete'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          onTap: () => sessionModel.duplicateBlockAt(widget.index),
+          child: const Row(
+            children: [
+              Icon(Icons.content_copy, size: 20),
+              SizedBox(width: 8),
+              Text('Duplicate'),
+            ],
+          ),
         ),
       ],
     );
   }
-
-  final GlobalKey _dragHandleKey = GlobalKey();
 }
