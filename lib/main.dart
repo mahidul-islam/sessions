@@ -1,10 +1,19 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:provider/provider.dart';
+import 'package:session/firebase_options.dart';
 import 'models/session_model.dart';
 import 'widgets/session_editor.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase setup
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
     ChangeNotifierProvider(
       create: (context) => SessionModel(),
