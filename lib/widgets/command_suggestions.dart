@@ -11,7 +11,6 @@ class CommandSuggestions extends StatelessWidget {
     required this.currentCommand,
     this.onSuggestionSelected,
   }) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     final sessionModel = Provider.of<SessionModel>(context);
@@ -22,7 +21,10 @@ class CommandSuggestions extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(maxHeight: 250),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context)
+            .colorScheme
+            .surface
+            .withOpacity(0.95), // Slightly more opaque
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
@@ -30,6 +32,11 @@ class CommandSuggestions extends StatelessWidget {
             color: Colors.black.withOpacity(0.3),
           ),
         ],
+        // Add a subtle border
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: ListView.builder(
         shrinkWrap: true,
@@ -38,13 +45,29 @@ class CommandSuggestions extends StatelessWidget {
         itemBuilder: (context, index) {
           final suggestion = suggestions[index];
           return ListTile(
-            leading: Icon(suggestion.icon),
-            title: Text(suggestion.command),
-            subtitle: Text(suggestion.description),
+            leading: Icon(
+              suggestion.icon,
+              color: Theme.of(context).colorScheme.primary, // Use primary color
+            ),
+            title: Text(
+              suggestion.command,
+              style: const TextStyle(
+                color: Colors.white, // Ensure white text
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text(
+              suggestion.description,
+              style: TextStyle(
+                color: Colors.grey[300], // Lighter grey for subtitles
+              ),
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 4,
             ),
+            tileColor: Colors.transparent,
+            hoverColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
             dense: true,
             onTap: () {
               // Apply the suggestion to the current command
@@ -63,7 +86,7 @@ class CommandSuggestions extends StatelessWidget {
               }
 
               if (onSuggestionSelected != null) {
-                onSuggestionSelected!(suggestion.command);
+                onSuggestionSelected!(newCommand);
               } else {
                 sessionModel.setCurrentCommand(newCommand);
               }

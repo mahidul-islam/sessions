@@ -41,24 +41,6 @@ class SessionEditor extends StatelessWidget {
             ],
           ),
         ),
-
-        // Show command suggestions when needed
-        if (sessionModel.showCommandSuggestions &&
-            sessionModel.focusedBlockIndex >= 0)
-          Positioned(
-            left: 16,
-            right: 16,
-            top: sessionModel.commandEditorPositionY > 0
-                ? sessionModel.commandEditorPositionY
-                : 100,
-            child: CommandSuggestions(
-              currentCommand: sessionModel.currentCommand,
-              onSuggestionSelected: (suggestion) {
-                // Apply the suggestion and refocus
-                sessionModel.setCurrentCommand(suggestion);
-              },
-            ),
-          ),
       ],
     );
   }

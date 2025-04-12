@@ -11,13 +11,11 @@ class SessionModel extends ChangeNotifier {
   int _focusedBlockIndex = 0;
   bool _showCommandSuggestions = false;
   String _currentCommand = '';
-  double _commandEditorPositionY = 0;
 
   List<Block> get blocks => _blocks;
   int get focusedBlockIndex => _focusedBlockIndex;
   bool get showCommandSuggestions => _showCommandSuggestions;
   String get currentCommand => _currentCommand;
-  double get commandEditorPositionY => _commandEditorPositionY;
 
   int get totalDurationMinutes {
     int total = 0;
@@ -30,7 +28,6 @@ class SessionModel extends ChangeNotifier {
   }
 
   void setCommandEditorPosition(double positionY) {
-    _commandEditorPositionY = positionY;
     notifyListeners();
   }
 

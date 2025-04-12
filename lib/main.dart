@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_portal/flutter_portal.dart';
 import 'package:provider/provider.dart';
 import 'models/session_model.dart';
 import 'widgets/session_editor.dart';
@@ -17,21 +18,23 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'WorkoutPro',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.indigo,
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.indigo,
-          secondary: Colors.tealAccent,
-          tertiary: Colors.amber,
-          surface: Color(0xFF1E1E1E),
+    return Portal(
+      child: MaterialApp(
+        title: 'WorkoutPro',
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          primaryColor: Colors.indigo,
+          colorScheme: const ColorScheme.dark(
+            primary: Colors.indigo,
+            secondary: Colors.tealAccent,
+            tertiary: Colors.amber,
+            surface: Color(0xFF1E1E1E),
+          ),
+          useMaterial3: true,
+          fontFamily: 'Inter',
         ),
-        useMaterial3: true,
-        fontFamily: 'Inter',
+        home: const SessionEditorScreen(),
       ),
-      home: const SessionEditorScreen(),
     );
   }
 }

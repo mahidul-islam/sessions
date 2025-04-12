@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_portal/flutter_portal.dart';
 import 'package:provider/provider.dart';
+import 'package:session/widgets/command_suggestions.dart';
 import '../models/block.dart';
 import '../models/circuit_block.dart';
 import '../models/interval_block.dart';
@@ -41,16 +43,30 @@ class _BlockRendererState extends State<BlockRenderer> {
     super.initState();
     _commandController = TextEditingController();
     _textFieldFocusNode = FocusNode();
-    _keyboardListenerFocusNode = FocusNode(); // Initialize the new focus node
+    _keyboardListenerFocusNode = FocusNode();
+    _textFieldFocusNode.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
+    _textFieldFocusNode.removeListener(_onFocusChange);
     _commandController.dispose();
     _textFieldFocusNode.dispose();
     _keyboardListenerFocusNode.dispose(); // Dispose the new focus node
 
     super.dispose();
+  }
+
+// Focus change handler
+  void _onFocusChange() {
+    if (!_textFieldFocusNode.hasFocus && _isEditingCommand) {
+      // Add a small delay to prevent issues with suggestion selection
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && _isEditingCommand && !_textFieldFocusNode.hasFocus) {
+          _cancelEditing();
+        }
+      });
+    }
   }
 
   @override
@@ -70,18 +86,38 @@ class _BlockRendererState extends State<BlockRenderer> {
       });
     }
 
-    return Container(
-      key: _blockKey,
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        border: widget.isFocused
-            ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-            : null,
-        borderRadius: BorderRadius.circular(8),
+    return PortalTarget(
+      visible: _isEditingCommand && sessionModel.showCommandSuggestions,
+      portalFollower: IgnorePointer(
+        ignoring: false,
+        child: CommandSuggestions(
+          currentCommand: sessionModel.currentCommand,
+          onSuggestionSelected: (suggestion) {
+            _commandController.text = suggestion;
+            sessionModel.setCurrentCommand(suggestion);
+            // _focusNode.requestFocus();
+          },
+        ),
       ),
-      child: _isEditingCommand
-          ? _buildCommandEditor(context, sessionModel)
-          : _buildBlockView(context, sessionModel),
+      // Use alignment to position the suggestions
+      anchor: const Aligned(
+        follower: Alignment.bottomCenter,
+        target: Alignment.topCenter,
+      ),
+      child: Container(
+        key: _blockKey,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          border: widget.isFocused
+              ? Border.all(
+                  color: Theme.of(context).colorScheme.primary, width: 2)
+              : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: _isEditingCommand
+            ? _buildCommandEditor(context, sessionModel)
+            : _buildBlockView(context, sessionModel),
+      ),
     );
   }
 
