@@ -21,6 +21,7 @@ class MainApp extends StatelessWidget {
     return Portal(
       child: MaterialApp(
         title: 'WorkoutPro',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,
           primaryColor: Colors.indigo,
